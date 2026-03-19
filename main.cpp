@@ -34,6 +34,7 @@ public:
             cout << " 1- Organize\n";
             cout << " 2- Add path\n";
             cout << " 3- Erase path\n";
+            cout << " 4- Search path\n";
             cout << " 0- Quit\n";
 
             choice = _getch();
@@ -48,6 +49,9 @@ public:
                     break;
                 case '3':
                     removePath();
+                    break;
+                case '4':
+                    searchPath();
                     break;
                 case '0':
                     exit();
@@ -169,7 +173,7 @@ public:
                 }
 
                 if (!exists) break;
-
+                system("CLS");
                 cout << "Extension already exists, try another\n";
                 system("pause");
                 continue;
@@ -190,7 +194,7 @@ public:
             system("CLS");
             cout << "Select the extension you want to remove:\n > ";
 
-            extStr = getLineBetter();
+            extStr = getLineBetterSearch("Select the extension you want to remove");
             if (extStr.empty()) return 0;
 
             if (extStr[0] == '.') break;
@@ -216,6 +220,12 @@ public:
         return 0;
     }
 
+    int searchPath() {
+        cout << "Search:\n > ";
+        getLineBetterSearch("Search");
+        return 0;
+    }
+
 private:
     string getClipboardText() {
         if (!OpenClipboard(nullptr)) return "";
@@ -232,6 +242,45 @@ private:
         CloseClipboard();
 
         return text;
+    }
+
+    void printSearch(string String) {
+        for (int i = 0; i < data.size(); i++) {
+            if (!String.empty() && data[i].ext.rfind(String, 0) == 0) {
+                cout << data[i].ext << " -> " << data[i].path.string() << '\n';
+            }
+        }
+    }
+    string getLineBetterSearch(string Name) {
+        string String = "";
+        while (true) {
+            if (_kbhit()) {
+                char hold = _getch();
+
+                if (hold == 13) break;
+                if (hold == 27) return "";
+
+                if (hold == 22) {
+                    string clip = getClipboardText();
+                    for (char c : clip) {
+                        if (isprint(c)) String.push_back(c);
+                    }
+                }
+
+                if (hold == 8) {
+                    if (!String.empty()) String.pop_back();
+                }
+
+                if (isprint(hold)) {
+                    String.push_back(hold);
+                }
+
+                system("CLS");
+                cout << Name << ":\n > " << String << "\n\n";
+                printSearch(String);
+            }
+        }
+        return String;
     }
 
     string getLineBetter() {
