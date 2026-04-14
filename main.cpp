@@ -6,15 +6,13 @@
 #include <cctype>
 #include <thread>
 #include <chrono>
-#include <algorithm> // <--- CORREÇÃO: Biblioteca necessária para remove_if
-
-// --- Abstração de Sistema Operacional ---
+#include <algorithm>
 
 #ifdef _WIN32
     #include <windows.h>
     #include <conio.h>
     #define OS_WINDOWS 1
-    
+
     void setupConsole() {
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
         DWORD dwMode = 0;
@@ -23,22 +21,22 @@
         SetConsoleMode(hOut, dwMode);
         SetConsoleCtrlHandler(NULL, TRUE);
     }
-    void restoreConsole() {} 
+    void restoreConsole() {}
 #else
     #include <termios.h>
     #include <unistd.h>
     #include <sys/select.h>
     #define OS_WINDOWS 0
-    
+
     termios orig_termios;
-    
+
     void setupConsole() {
         tcgetattr(STDIN_FILENO, &orig_termios);
         termios new_termios = orig_termios;
         new_termios.c_lflag &= ~(ICANON | ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
     }
-    
+
     void restoreConsole() {
         tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
     }
@@ -60,7 +58,7 @@ namespace UI {
 
 // --- Funções de Input Unificadas ---
 
-bool kbhit() {
+bool keybindhit() {
     #ifdef _WIN32
         return _kbhit();
     #else
@@ -84,7 +82,7 @@ char readChar() {
 
 void pauseExec() {
     cout << UI::YELLOW << "\n[Pressione qualquer tecla para continuar]" << UI::RESET << flush;
-    while(!kbhit()) this_thread::sleep_for(chrono::milliseconds(10));
+    while(!keybindhit()) this_thread::sleep_for(chrono::milliseconds(10));
     readChar();
 }
 
@@ -126,8 +124,6 @@ struct Storage {
     Storage(string p, string e) : path(p), ext(e) {}
 };
 
-// --- Classe Principal ---
-
 class Organizer {
     vector<Storage> data;
 
@@ -139,7 +135,7 @@ public:
         while (true) {
             cout << UI::CLEAR;
             printUI();
-            
+
             choice = readChar();
             cout << UI::CLEAR;
 
@@ -149,8 +145,8 @@ public:
                 case '3': removePath(); break;
                 case '4': searchPath(); break;
                 case '0': return;
-                default: 
-                    cout << UI::RED << "Opção inválida." << UI::RESET << endl;
+                default:
+                    cout << UI::RED << "Opcao invalida." << UI::RESET << endl;
                     pauseExec();
             }
         }
@@ -161,7 +157,7 @@ private:
         cout << UI::BOLD << "============================" << UI::RESET << "\n";
         cout << UI::BOLD << "       FILE ORGANIZER       " << UI::RESET << "\n";
         cout << UI::BOLD << "============================" << UI::RESET << "\n\n";
-        
+
         cout << UI::CYAN << " 1" << UI::RESET << " - Organizar Arquivos\n";
         cout << UI::CYAN << " 2" << UI::RESET << " - Adicionar Regra\n";
         cout << UI::CYAN << " 3" << UI::RESET << " - Remover Regra\n";
@@ -189,10 +185,10 @@ private:
     string getLineInput(const string& prompt) {
         string buffer;
         cout << prompt << "\n > " << flush;
-        
+
         while (true) {
             char c = readChar();
-            
+
             if (c == 13 || c == 10) {
                 cout << "\n";
                 return buffer;
@@ -225,20 +221,35 @@ private:
     }
 
     string searchInput(const string& prompt) {
-        string buffer;
+        string buffer, bufferLast;
         while (true) {
             cout << UI::CLEAR;
             cout << prompt << "\n > " << UI::BOLD << buffer << UI::RESET << "\n\n";
-            printSearchResults(buffer);
-            
-            while(!kbhit()) this_thread::sleep_for(chrono::milliseconds(20));
-            
+
+            printSearchResults(bufferLast);
+
+            while(!keybindhit()) this_thread::sleep_for(chrono::milliseconds(20));
+
             char c = readChar();
-            
+
             if (c == 13 || c == 10) return buffer;
             if (c == 27) return "";
             if (c == 8 || c == 127) { if (!buffer.empty()) buffer.pop_back(); }
             else if (isprint(c)) buffer.push_back(c);
+
+            int last;
+            for (int i = 0; i < buffer.size(); i++) {
+                last = buffer.size()-i;
+                if (buffer[last] == '.') break;
+            }
+            bufferLast = "";
+            if (last == 0) bufferLast = buffer;
+            else {
+                for (int i = last; i < buffer.size(); i++) {
+                    if (buffer[i] == ' ') continue;
+                    bufferLast.push_back(buffer[i]);
+                }
+            }
         }
     }
 
@@ -247,12 +258,11 @@ private:
         bool found = false;
         for (const auto& d : data) {
             if (filter.empty() || d.ext.find(filter) != string::npos) {
-                cout << " " << UI::GREEN << d.ext << UI::RESET 
-                     << " -> " << d.path.string() << "\n";
+                cout << " " << UI::GREEN << d.ext << UI::RESET << " -> " << d.path.string() << "\n";
                 found = true;
             }
         }
-        if (!found) cout << UI::RED << " Nenhuma correspondência." << UI::RESET << "\n";
+        if (!found) cout << UI::RED << " Nenhuma correspondencia." << UI::RESET << "\n";
     }
 
     void organizeFiles() {
@@ -261,7 +271,7 @@ private:
 
         fs::path src(pathStr);
         if (!fs::exists(src) || !fs::is_directory(src)) {
-            cout << UI::RED << "Caminho inválido." << UI::RESET << "\n";
+            cout << UI::RED << "Caminho invalido." << UI::RESET << "\n";
             pauseExec();
             return;
         }
@@ -287,58 +297,105 @@ private:
                 }
             }
         }
-        cout << UI::GREEN << "\nConcluído! " << count << " arquivos movidos." << UI::RESET << "\n";
+        cout << UI::GREEN << "\nConcluido! " << count << " arquivos movidos." << UI::RESET << "\n";
         pauseExec();
     }
 
     void addPath() {
-        string p = getLineInput("Caminho de destino");
-        if (p.empty()) return;
-        if (!fs::exists(p)) {
-            cout << UI::RED << "Caminho não existe." << UI::RESET << "\n";
-            pauseExec(); return;
+        string p, e, holder;
+        while (true) {
+            p = getLineInput("Caminho de destino");
+            if (p.empty()) return;
+            if (!fs::exists(p)) {
+                cout << UI::CLEAR << UI::RED << "Caminho nao existe." << UI::RESET << "\n\n";
+            } else break;
         }
 
-        string e = getLineInput("Extensão (ex: .png)");
-        if (e.empty() || e[0] != '.') {
-            cout << UI::RED << "Extensão inválida." << UI::RESET << "\n";
-            pauseExec(); return;
+        cout << UI::CLEAR;
+
+        while (true){
+            e = getLineInput("Extensao (ex: .png)");
+            if (e.empty()) return;
+            for (int i = 0; i < e.size(); i++) {
+                switch (e[i]) {
+                    case '.':
+                        if (holder[0]=='.') {
+                            data.emplace_back(p, holder);
+                            holder = ".";
+                        } else {
+                            holder = ".";
+                        }
+                        break;
+                    case ' ':
+                        break;
+                    default:
+                        holder.push_back(e[i]);
+                        break;
+                }
+            }
+            if (holder[0] != '.') {
+                cout << UI::CLEAR << UI::RED << "Extensao invalida: " << holder << "." << UI::RESET << "\n";
+            } else break;
         }
 
-        data.emplace_back(p, e);
+        data.emplace_back(p, holder);
         savePaths();
         cout << UI::GREEN << "Regra salva!" << UI::RESET << "\n";
         pauseExec();
     }
 
     void removePath() {
-        string e = searchInput("Extensão para remover");
+        string holder;
+        string e = searchInput("Extensao para remover");
         if (e.empty()) return;
 
-        auto it = remove_if(data.begin(), data.end(), [&e](const Storage& s){ return s.ext == e; });
+        for (int i = 0; i < e.size(); i++) {
+            switch (e[i]) {
+                case '.':
+                    if (holder[0]=='.') {
+                        auto it = remove_if(data.begin(), data.end(), [&holder](const Storage& s){ return s.ext == holder; });
+                        if (it != data.end()) {
+                            data.erase(it, data.end());
+                            savePaths();
+                            cout << UI::GREEN << "Extensao: " << UI::RESET << holder << " Removido." << UI::RESET << "\n";
+                        } else {
+                            cout << UI::RED << "Extensao: " << UI::RESET << holder << UI::RED << " Não encontrado." << UI::RESET << "\n";
+                        }
+                    }
+                    holder = ".";
+                    break;
+                case ' ':
+                    break;
+                default:
+                    holder.push_back(e[i]);
+                    break;
+            }
+        }
+
+        auto it = remove_if(data.begin(), data.end(), [&holder](const Storage& s){ return s.ext == holder; });
         if (it != data.end()) {
             data.erase(it, data.end());
             savePaths();
-            cout << UI::GREEN << "\nRemovido." << UI::RESET << "\n";
+            cout << UI::GREEN << "Extensao: " << UI::RESET << holder << " Removido." << UI::RESET << "\n";
         } else {
-            cout << UI::RED << "\nNão encontrado." << UI::RESET << "\n";
+            cout << UI::RED << "Extensao: " << UI::RESET << holder << UI::RED << " Não encontrado." << UI::RESET << "\n";
         }
+
         pauseExec();
     }
 
     void searchPath() {
-        searchInput("Buscar extensão");
-        pauseExec();
+        searchInput("Buscar extensao");
     }
 };
 
 int main() {
     setupConsole();
     atexit(restoreConsole);
-    
+
     Organizer app;
     app.run();
-    
+
     cout << UI::CLEAR << "Saindo...\n";
     return 0;
 }
